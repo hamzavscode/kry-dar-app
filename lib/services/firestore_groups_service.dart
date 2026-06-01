@@ -120,9 +120,19 @@ class FirestoreGroupsService {
   Stream<List<Map<String, dynamic>>> streamHouseGroups(String houseId) {
     return _groups
         .where('houseId', isEqualTo: houseId)
-        .orderBy('createdAt', descending: false)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+        .map((snap) {
+          final list = snap.docs.map((d) => {...d.data(), 'id': d.id}).toList();
+          list.sort((a, b) {
+            final aTime = a['createdAt'] as Timestamp?;
+            final bTime = b['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return -1;
+            if (bTime == null) return 1;
+            return aTime.compareTo(bTime);
+          });
+          return list;
+        });
   }
 
   /// Stream all groups the user is a member of
