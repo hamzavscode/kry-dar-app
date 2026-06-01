@@ -78,9 +78,20 @@ class FirestoreHousesService {
   Stream<List<Map<String, dynamic>>> streamAvailableHouses() {
     return _houses
         .where('status', isEqualTo: 'disponible')
-        .orderBy('created_at', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+        .map((snap) {
+          final list = snap.docs.map((d) => {...d.data(), 'id': d.id}).toList();
+          // Sort client-side by created_at descending (newest first)
+          list.sort((a, b) {
+            final aTime = a['created_at'] as Timestamp?;
+            final bTime = b['created_at'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime);
+          });
+          return list;
+        });
   }
 
   // ── Filtered search (when renter applies filters) ──
