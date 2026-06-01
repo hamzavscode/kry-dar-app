@@ -17,58 +17,42 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   final FirestoreHousesService _houses = FirestoreHousesService();
   final CurrentUserService _currentUser = CurrentUserService();
 
-  String _currentCity = 'Ville automatique';
+  String _currentCity = 'Chargement...';
 
   final TextEditingController _searchController = TextEditingController();
 
   FilterParams? _filterParams;
-  bool _loading = true;
-  List<Map<String, dynamic>> _nearbyHouses = [];
+
+  // When filter is applied, we use a Future-based list instead of the stream
+  bool _useFilter = false;
+  bool _filterLoading = false;
+  List<Map<String, dynamic>> _filteredHouses = [];
+
+  double? _userLat;
+  double? _userLng;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadLocation();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
-
-    final pos = await _geo.getCurrentPositionAndCity();
-    final lat = pos.$1;
-    final lng = pos.$2;
-    final city = pos.$3;
-
-    setState(() => _currentCity = city);
-
-    final params = _filterParams ?? FilterParams(
-      maxDistanceKm: 5,
-      ville: city,
-      quartier: '',
-      minPrice: 500,
-      maxPrice: 3500,
-      minChambres: 1,
-      maxColoc: 4,
-      groupeOnly: false,
-    );
-
-    final results = await _houses.searchNearbyHouses(
-      centerLat: lat,
-      centerLng: lng,
-      maxDistanceKm: params.maxDistanceKm,
-      ville: params.ville,
-      quartier: params.quartier,
-      minPrice: params.minPrice,
-      maxPrice: params.maxPrice,
-      minChambres: params.minChambres,
-      maxColoc: params.maxColoc,
-      groupeOnly: params.groupeOnly,
-    );
-
-    setState(() {
-      _nearbyHouses = results;
-      _loading = false;
-    });
+  Future<void> _loadLocation() async {
+    try {
+      final pos = await _geo.getCurrentPositionAndCity();
+      if (mounted) {
+        setState(() {
+          _userLat = pos.$1;
+          _userLng = pos.$2;
+          _currentCity = pos.$3;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _currentCity = 'Localisation indisponible');
+      }
+      debugPrint('GEOLOCATION ERROR: $e');
+    }
   }
 
   @override
@@ -78,13 +62,17 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   }
 
   Future<void> _openFilter() async {
-    final currentPos = await _geo.getCurrentPositionAndCity();
-    final lat = currentPos.$1;
-    final lng = currentPos.$2;
-
     final result = await Navigator.pushNamed(context, '/filter');
     if (result is FilterParams) {
-      setState(() => _filterParams = result);
+      setState(() {
+        _filterParams = result;
+        _useFilter = true;
+        _filterLoading = true;
+      });
+
+      final lat = _userLat ?? 0.0;
+      final lng = _userLng ?? 0.0;
+
       final results = await _houses.searchNearbyHouses(
         centerLat: lat,
         centerLng: lng,
@@ -98,8 +86,21 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
         groupeOnly: result.groupeOnly,
       );
 
-      setState(() => _nearbyHouses = results);
+      if (mounted) {
+        setState(() {
+          _filteredHouses = results;
+          _filterLoading = false;
+        });
+      }
     }
+  }
+
+  void _clearFilter() {
+    setState(() {
+      _filterParams = null;
+      _useFilter = false;
+      _filteredHouses = [];
+    });
   }
 
   @override
@@ -109,6 +110,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // ── Header ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
@@ -117,7 +119,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                   const Expanded(
                     child: Center(
                       child: Text(
-                        'Home screen',
+                        'Trouver une maison',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
@@ -131,18 +133,22 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               ),
             ),
 
+            // ── Location ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   const Icon(Icons.location_on, size: 18, color: Color(0xFF3D7A8A)),
                   const SizedBox(width: 4),
-                  Text(
-                    _currentCity,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF2D2D2D),
+                  Expanded(
+                    child: Text(
+                      _currentCity,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF2D2D2D),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -151,6 +157,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
 
             const SizedBox(height: 10),
 
+            // ── Search bar + filter ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -182,25 +189,77 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
+                        color: _useFilter ? const Color(0xFF3D7A8A) : const Color(0xFFF0F0F0),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.tune, size: 20, color: Color(0xFF2D2D2D)),
+                      child: Icon(
+                        Icons.tune,
+                        size: 20,
+                        color: _useFilter ? Colors.white : const Color(0xFF2D2D2D),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 16),
+            // ── Active filter indicator ──
+            if (_useFilter)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3D7A8A).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.filter_alt, size: 14, color: Color(0xFF3D7A8A)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Filtre actif: ${_filterParams?.ville ?? ''}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF3D7A8A)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: _clearFilter,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.close, size: 14, color: Colors.red),
+                            SizedBox(width: 2),
+                            Text('Effacer', style: TextStyle(fontSize: 11, color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            const SizedBox(height: 10),
+
+            // ── Section title ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Proches de vous',
-                  style: TextStyle(
+                  _useFilter ? 'Résultats filtrés' : 'Maisons disponibles',
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF2D2D2D),
@@ -211,35 +270,137 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
 
             const SizedBox(height: 10),
 
+            // ── Houses list ──
             Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _nearbyHouses.isEmpty
-                      ? const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.home_outlined, size: 60, color: Color(0xFFCCBBA0)),
-                              SizedBox(height: 12),
-                              Text(
-                                'Aucune maison disponible près de vous',
-                                style: TextStyle(color: Color(0xFF9A8070), fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _nearbyHouses.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            return _RenterHouseCard(house: _nearbyHouses[index]);
-                          },
-                        ),
+              child: _useFilter
+                  ? _buildFilteredList()
+                  : _buildStreamList(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Real-time stream of ALL available houses (no filter applied)
+  Widget _buildStreamList() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _houses.streamAvailableHouses(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snap.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 50, color: Colors.red),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Erreur de chargement:\n${snap.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => setState(() {}),
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Réessayer'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3D7A8A),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final houses = snap.data ?? [];
+
+        if (houses.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.home_outlined, size: 60, color: Color(0xFFCCBBA0)),
+                SizedBox(height: 12),
+                Text(
+                  'Aucune maison disponible pour le moment',
+                  style: TextStyle(color: Color(0xFF9A8070), fontSize: 14),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Les nouvelles maisons apparaîtront ici automatiquement',
+                  style: TextStyle(color: Color(0xFFBBA88A), fontSize: 12),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            // Stream auto-refreshes, but allow pull-to-refresh for UX
+            setState(() {});
+          },
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: houses.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              return _RenterHouseCard(house: houses[index]);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// Filtered list (after user applies a filter)
+  Widget _buildFilteredList() {
+    if (_filterLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_filteredHouses.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.search_off, size: 60, color: Color(0xFFCCBBA0)),
+            const SizedBox(height: 12),
+            const Text(
+              'Aucune maison trouvée avec ces critères',
+              style: TextStyle(color: Color(0xFF9A8070), fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _clearFilter,
+              icon: const Icon(Icons.close, size: 16),
+              label: const Text('Effacer le filtre'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3D7A8A),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _filteredHouses.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        return _RenterHouseCard(house: _filteredHouses[index]);
+      },
     );
   }
 }
@@ -252,6 +413,8 @@ class _RenterHouseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final images = (house['images'] as List?)?.cast<String>() ?? [];
     final price = house['prix_mensuel'] ?? 0;
+    final ville = (house['ville'] as String?) ?? '';
+    final quartier = (house['rue_quartier'] as String?) ?? 'Quartier';
 
     return GestureDetector(
       onTap: () {
@@ -274,136 +437,149 @@ class _RenterHouseCard extends StatelessWidget {
             ),
           ],
         ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: images.isNotEmpty
-                ? SizedBox(
-                    width: double.infinity,
-                    height: 160,
-                    child: Stack(
-                      children: [
-                        // First image (base)
-                        Positioned.fill(
-                          child: Image.network(
-                            images[0],
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFFCCBBA0),
-                              child: const Icon(
-                                Icons.home,
-                                size: 50,
-                                color: Colors.white54,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Image section ──
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: images.isNotEmpty
+                  ? SizedBox(
+                      width: double.infinity,
+                      height: 180,
+                      child: Image.network(
+                        images[0],
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            color: const Color(0xFFF0E6D0),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF3D7A8A),
                               ),
                             ),
+                          );
+                        },
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFCCBBA0),
+                          child: const Icon(
+                            Icons.home,
+                            size: 50,
+                            color: Colors.white54,
                           ),
                         ),
-                        // Second image shifted to the right
-                        if (images.length > 1)
-                          Positioned(
-                            top: 0,
-                            bottom: 0,
-                            left: 28,
-                            right: -28,
-                            child: Image.network(
-                              images[1],
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                            ),
-                          ),
-                        // Third image shifted further to the right
-                        if (images.length > 2)
-                          Positioned(
-                            top: 0,
-                            bottom: 0,
-                            left: 56,
-                            right: -56,
-                            child: Image.network(
-                              images[2],
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                            ),
-                          ),
-                      ],
-                    ),
-                  )
-                : Container(
-                    width: double.infinity,
-                    height: 160,
-                    color: const Color(0xFFCCBBA0),
-                    child: const Icon(Icons.home, size: 50, color: Colors.white54),
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 14, color: Color(0xFF3D7A8A)),
-                          const SizedBox(width: 3),
-                          Text(
-                            (house['rue_quartier'] as String?) ?? 'Quartier',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2D2D2D),
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '$price MAD',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2D2D2D),
-                            ),
-                          ),
-                        ],
                       ),
-                      const SizedBox(height: 4),
+                    )
+                  : Container(
+                      width: double.infinity,
+                      height: 180,
+                      color: const Color(0xFFCCBBA0),
+                      child: const Icon(Icons.home, size: 50, color: Colors.white54),
+                    ),
+            ),
+
+            // ── Info section ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 14, color: Color(0xFF3D7A8A)),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          '$quartier, $ville',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2D2D2D),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '$price MAD',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFD4845A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      // Chambres badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3D7A8A).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.bed, size: 12, color: Color(0xFF3D7A8A)),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${house['nombre_chambres'] ?? '-'} ch.',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF3D7A8A)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Max coloc badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD4845A).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.people, size: 12, color: Color(0xFFD4845A)),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Max ${house['nombre_max'] ?? '-'}',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFFD4845A)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      // Owner name
                       Row(
                         children: [
-                          const Text(
-                            'distance inconnue',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF9A8070)),
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3D7A8A).withOpacity(0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.person, size: 14, color: Color(0xFF3D7A8A)),
                           ),
-                          const Spacer(),
-                          Row(
-                            children: [
-                              Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF3D7A8A).withOpacity(0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.person, size: 14, color: Color(0xFF3D7A8A)),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                (house['ownerName'] as String?) ?? 'Nom propriétaire',
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF5A4A38)),
-                              ),
-                            ],
+                          const SizedBox(width: 4),
+                          Text(
+                            (house['ownerName'] as String?) ?? 'Propriétaire',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF5A4A38)),
                           ),
                         ],
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

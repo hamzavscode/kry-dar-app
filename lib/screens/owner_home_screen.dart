@@ -113,11 +113,10 @@ class OwnerHomeScreen extends StatelessWidget {
                   }
 
                   debugPrint('OwnerHomeScreen ownerId=$ownerId');
-                  return FutureBuilder<List<Map<String, dynamic>>>(
-                    future: housesService.getHousesByOwner(ownerId: ownerId),
-
+                  return StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: housesService.streamHousesByOwner(ownerId: ownerId),
                     builder: (context, snap) {
-                      if (snap.connectionState != ConnectionState.done) {
+                      if (snap.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
 
@@ -125,13 +124,12 @@ class OwnerHomeScreen extends StatelessWidget {
                       if (houses.isEmpty) {
                         return Center(
                           child: Text(
-                            'Aucune maison ajoutée (ownerId: $ownerId)',
+                            'Aucune maison ajoutée',
                             style: const TextStyle(color: Color(0xFF9A8070), fontSize: 15),
                             textAlign: TextAlign.center,
                           ),
                         );
                       }
-
 
                       return ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 20),

@@ -50,24 +50,42 @@ class FirestoreHousesService {
       'machine_laver': machineLaver,
       'groupes_autorises': groupesAutorises,
       'status': status,
-
-
       'created_at': FieldValue.serverTimestamp(),
     });
   }
 
-Future<List<Map<String, dynamic>>> getHousesByOwner({
-  required String ownerId,
-}) async {
-  final snap = await _houses
-      .where('ownerId', isEqualTo: ownerId)
-      .get();
+  Future<List<Map<String, dynamic>>> getHousesByOwner({
+    required String ownerId,
+  }) async {
+    final snap = await _houses
+        .where('ownerId', isEqualTo: ownerId)
+        .get();
 
-  return snap.docs.map((d) => {...d.data(), 'id': d.id}).toList();
-}
+    return snap.docs.map((d) => {...d.data(), 'id': d.id}).toList();
+  }
 
-  // NOTE: Firestore doesn't support real geo-distance without extra libraries.
-  // For now we filter by city/price/rooms and do distance filtering client-side.
+  Stream<List<Map<String, dynamic>>> streamHousesByOwner({
+    required String ownerId,
+  }) {
+    return _houses
+        .where('ownerId', isEqualTo: ownerId)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+  }
+
+  // ── Stream ALL available houses (for renter initial load) ──
+  // Only filters by status == 'disponible' (single where, no composite index needed)
+  Stream<List<Map<String, dynamic>>> streamAvailableHouses() {
+    return _houses
+        .where('status', isEqualTo: 'disponible')
+        .orderBy('created_at', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+  }
+
+  // ── Filtered search (when renter applies filters) ──
+  // We only use ONE server-side filter (status) and do the rest client-side
+  // to avoid needing composite indexes.
   Future<List<Map<String, dynamic>>> searchNearbyHouses({
     required double centerLat,
     required double centerLng,
@@ -80,37 +98,52 @@ Future<List<Map<String, dynamic>>> getHousesByOwner({
     required int maxColoc,
     required bool groupeOnly,
   }) async {
-
-    // city/price/status filters (server-side)
-    Query<Map<String, dynamic>> q = _houses
-        .where('ville', isEqualTo: ville)
+    // Only use status filter on server side – avoids composite index requirements
+    final snap = await _houses
         .where('status', isEqualTo: 'disponible')
-        .where('prix_mensuel', isGreaterThanOrEqualTo: minPrice)
-        .where('prix_mensuel', isLessThanOrEqualTo: maxPrice)
-        .where('nombre_chambres', isGreaterThanOrEqualTo: minChambres)
-        .where('nombre_max', isGreaterThanOrEqualTo: maxColoc);
-
-    if (groupeOnly) {
-      q = q.where('groupes_autorises', isEqualTo: true);
-    }
-
-
-    final snap = await q.get();
+        .get();
 
     final results = <Map<String, dynamic>>[];
     for (final doc in snap.docs) {
       final data = {...doc.data(), 'id': doc.id};
 
+      // ── Client-side filters ──
+
+      // City filter (case-insensitive)
+      final houseVille = (data['ville'] as String?) ?? '';
+      if (ville.isNotEmpty && houseVille.toLowerCase() != ville.toLowerCase()) {
+        continue;
+      }
+
+      // Price filter
+      final prix = (data['prix_mensuel'] as num?)?.toInt() ?? 0;
+      if (prix < minPrice || prix > maxPrice) continue;
+
+      // Chambres filter
+      final chambres = (data['nombre_chambres'] as num?)?.toInt() ?? 0;
+      if (chambres < minChambres) continue;
+
+      // Max coloc filter
+      final maxC = (data['nombre_max'] as num?)?.toInt() ?? 0;
+      if (maxC < maxColoc) continue;
+
+      // Groupe filter
+      if (groupeOnly) {
+        final groupes = data['groupes_autorises'] as bool? ?? false;
+        if (!groupes) continue;
+      }
+
+      // Distance filter
       final lat = (data['lat'] as num?)?.toDouble() ?? 0.0;
       final lng = (data['lng'] as num?)?.toDouble() ?? 0.0;
       final distanceKm = _distanceKm(centerLat, centerLng, lat, lng);
-      if (distanceKm <= maxDistanceKm) {
-        // quartier filter (soft)
-        final rq = (data['rue_quartier'] as String?) ?? '';
-        if (quartier.isEmpty || rq == quartier) {
-          results.add(data);
-        }
-      }
+      if (distanceKm > maxDistanceKm) continue;
+
+      // Quartier filter (soft – only if specified)
+      final rq = (data['rue_quartier'] as String?) ?? '';
+      if (quartier.isNotEmpty && rq != quartier) continue;
+
+      results.add(data);
     }
 
     return results;
@@ -137,4 +170,3 @@ Future<List<Map<String, dynamic>>> getHousesByOwner({
   double _degToRad(double deg) => deg * (math.pi / 180.0);
 
 }
-
