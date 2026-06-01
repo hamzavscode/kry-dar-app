@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'house_rented_screen.dart';
+import 'house_groups_screen.dart';
 
 /// Full detail view of a house listing for renters.
 class HouseDetailScreen extends StatelessWidget {
@@ -266,42 +267,77 @@ class HouseDetailScreen extends StatelessWidget {
             ),
           ),
 
-          // ── Contact Button ───────────────────────────────────────
+          // ── Bottom Group Actions ───────────────────────────────
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
             decoration: const BoxDecoration(
               color: Color(0xFFF5ECD7),
               border: Border(top: BorderSide(color: Color(0xFFDDD0B8), width: 0.8)),
             ),
-            child: SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Fonctionnalité bientôt disponible !'),
-                      backgroundColor: Color(0xFF3D7A8A),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 54,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => HouseGroupsScreen(house: house),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF3D7A8A), width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Créer un groupe',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF3D7A8A),
+                        ),
+                      ),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.chat_bubble_outline, size: 20),
-                label: const Text(
-                  'Contacter le propriétaire',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3D7A8A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => HouseGroupsScreen(house: house),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4845A),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Rejoindre un groupe',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
-                  elevation: 2,
                 ),
-              ),
+              ],
             ),
           ),
         ],
