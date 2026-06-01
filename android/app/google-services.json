@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "831134894069",
+    "project_id": "kri-darkoum",
+    "storage_bucket": "kri-darkoum.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:831134894069:android:819549e057b9a31ce102bc",
+        "android_client_info": {
+          "package_name": "com.example.mon_projet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmeZjDEzgV8K4khhWSegmFop7_4sIPaz4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
