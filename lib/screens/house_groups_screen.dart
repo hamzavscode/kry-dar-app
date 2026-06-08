@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/current_user_service.dart';
 import '../services/firestore_groups_service.dart';
 import 'group_chat_screen.dart';
+import 'payment_screen.dart';
 
 class HouseGroupsScreen extends StatefulWidget {
   const HouseGroupsScreen({super.key, required this.house});
@@ -42,6 +43,16 @@ class _HouseGroupsScreenState extends State<HouseGroupsScreen> {
         return;
       }
 
+    // Step: Payment before joining
+    final bool? paid = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(house: widget.house),
+      ),
+    );
+
+    if (paid != true) return;
+
     setState(() => _isLoadingAction = true);
     try {
       final name = currentUser['fullName'] ?? 'Utilisateur';
@@ -73,6 +84,16 @@ class _HouseGroupsScreenState extends State<HouseGroupsScreen> {
     final currentUserId = _userService.currentUserId;
     if (currentUser == null || currentUserId == null) return;
 
+    // Step: Payment before creating
+    final bool? paid = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(house: widget.house),
+      ),
+    );
+
+    if (paid != true) return;
+
     setState(() => _isLoadingAction = true);
     try {
       final name = currentUser['fullName'] ?? 'Utilisateur';
@@ -84,6 +105,7 @@ class _HouseGroupsScreenState extends State<HouseGroupsScreen> {
         houseId: widget.house['id'] ?? '',
         houseName: widget.house['rue_quartier'] ?? 'Maison',
         houseImage: houseImage,
+        housePrice: widget.house['prix_mensuel'] ?? 0,
         ownerId: widget.house['ownerId'] ?? '',
         maxMembers: widget.house['nombre_max'] ?? 1,
         creatorId: currentUserId,

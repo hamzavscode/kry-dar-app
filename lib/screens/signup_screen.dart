@@ -61,209 +61,207 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
           SafeArea(
-            child: Column(
-              children: [
-                SizedBox(height: MediaQuery.of(context).size.height * 0.10),
-                const Text(
-                  'Créer un compte',
-                  style: TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF4A2010),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.10),
+                  const Text(
+                    'Créer un compte',
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4A2010),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 36),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      _buildTextField(
-                        controller: _nameController,
-                        hint: 'Nom complet',
-                        icon: Icons.person_outline,
-                      ),
-                      const SizedBox(height: 14),
-                      _buildTextField(
-                        controller: _phoneController,
-                        hint: 'Numéro de téléphone',
-                        icon: Icons.phone_outlined,
-                        keyboardType: TextInputType.phone,
-                      ),
-                      const SizedBox(height: 14),
-                      _buildTextField(
-                        controller: _emailController,
-                        hint: 'Adresse e-mail',
-                        icon: Icons.mail_outline,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 14),
-                      _buildPasswordField(),
-                      const SizedBox(height: 28),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isLoading
-                              ? null
-                              : () async {
-                                  final fullName = _nameController.text.trim();
-                                  final phoneNumber = _phoneController.text.trim();
-                                  final email = _emailController.text.trim();
-                                  final password = _passwordController.text;
+                  const SizedBox(height: 36),
+                  _buildTextField(
+                    controller: _nameController,
+                    hint: 'Nom complet',
+                    icon: Icons.person_outline,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    controller: _phoneController,
+                    hint: 'Numéro de téléphone',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    controller: _emailController,
+                    hint: 'Adresse e-mail',
+                    icon: Icons.mail_outline,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildPasswordField(),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              final fullName = _nameController.text.trim();
+                              final phoneNumber = _phoneController.text.trim();
+                              final email = _emailController.text.trim();
+                              final password = _passwordController.text;
 
+                              setState(() {
+                                _statusMessage = null;
+                                _statusIsError = false;
+                              });
+
+                              if (fullName.isEmpty || phoneNumber.isEmpty) {
+                                setState(() {
+                                  _statusIsError = true;
+                                  _statusMessage =
+                                      'Veuillez remplir le nom complet et le numéro.';
+                                });
+                                return;
+                              }
+
+                              if (email.isEmpty || password.isEmpty) {
+                                setState(() {
+                                  _statusIsError = true;
+                                  _statusMessage =
+                                      'Veuillez remplir l’e-mail et le mot de passe.';
+                                });
+                                return;
+                              }
+
+                              setState(() => _isLoading = true);
+
+                              try {
+                                // DEBUG: prevents silent hang; visible in console
+                                // ignore: avoid_print
+                                print('Signup pressed. role=${widget.role}, email=$email');
+                                final exists = await _firestoreService
+                                    .emailExists(email: email);
+
+                                if (exists) {
                                   setState(() {
-                                    _statusMessage = null;
-                                    _statusIsError = false;
+                                    _statusIsError = true;
+                                    _statusMessage =
+                                        "Cet e-mail existe déjà.";
                                   });
+                                  return;
+                                }
 
-                                  if (fullName.isEmpty || phoneNumber.isEmpty) {
-                                    setState(() {
-                                      _statusIsError = true;
-                                      _statusMessage =
-                                          'Veuillez remplir le nom complet et le numéro.';
-                                    });
-                                    return;
+                                // Role: default required by your request.
+                                await _firestoreService.createUser(
+                                  fullName: fullName,
+                                  phoneNumber: phoneNumber,
+                                  email: email,
+                                  password: password,
+                                  role: widget.role,
+                                );
+
+                                setState(() {
+                                  _statusIsError = false;
+                                  _statusMessage =
+                                      'Compte créé avec succès !';
+                                });
+
+                                // Let AuthWrapper handle the redirection.
+                                if (!mounted) return;
+                                Future.delayed(const Duration(seconds: 1), () {
+                                  if (mounted) {
+                                    Navigator.of(context).popUntil((route) => route.isFirst);
                                   }
-
-                                  if (email.isEmpty || password.isEmpty) {
-                                    setState(() {
-                                      _statusIsError = true;
-                                      _statusMessage =
-                                          'Veuillez remplir l’e-mail et le mot de passe.';
-                                    });
-                                    return;
-                                  }
-
-                                  setState(() => _isLoading = true);
-
-                                  try {
-                                    // DEBUG: prevents silent hang; visible in console
-                                    // ignore: avoid_print
-                                    print('Signup pressed. role=${widget.role}, email=$email');
-                                    final exists = await _firestoreService
-                                        .emailExists(email: email);
-
-                                    if (exists) {
-                                      setState(() {
-                                        _statusIsError = true;
-                                        _statusMessage =
-                                            "Cet e-mail existe déjà.";
-                                      });
-                                      return;
-                                    }
-
-                                    // Role: default required by your request.
-                                    await _firestoreService.createUser(
-                                      fullName: fullName,
-                                      phoneNumber: phoneNumber,
-                                      email: email,
-                                      password: password,
-                                      role: widget.role,
-                                    );
-
-                                    setState(() {
-                                      _statusIsError = false;
-                                      _statusMessage =
-                                          'Compte créé avec succès !';
-                                    });
-
-                                    // Redirect to login directly.
-                                    if (!mounted) return;
-                                    Navigator.of(context)
-                                        .pushReplacementNamed('/login');
-                                  } catch (e) {
-                                    setState(() {
-                                      _statusIsError = true;
-                                      _statusMessage =
-                                          'Erreur: ${e.toString()}';
-                                    });
-                                  } finally {
-                                    if (mounted) setState(() => _isLoading = false);
-                                  }
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD4845A),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(32),
-                            ),
-                            elevation: 4,
-                            shadowColor: const Color(0xFFB06040),
+                                });
+                              } catch (e) {
+                                setState(() {
+                                  _statusIsError = true;
+                                  _statusMessage =
+                                      'Erreur: ${e.toString()}';
+                                });
+                              } finally {
+                                if (mounted) setState(() => _isLoading = false);
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4845A),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                        elevation: 4,
+                        shadowColor: const Color(0xFFB06040),
+                      ),
+                      child: Text(
+                        _isLoading ? '...' : "S'inscrire",
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_statusMessage != null)
+                    Text(
+                      _statusMessage!,
+                      style: TextStyle(
+                        color: _statusIsError
+                            ? const Color(0xFFD32F2F)
+                            : const Color(0xFF2E7D32),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: () {
+                      // TODO: implement forgot password.
+                    },
+                    child: const Text(
+                      'Mot de passe oublié ?',
+                      style: TextStyle(
+                        color: Color(0xFFD4845A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const Divider(
+                    height: 32,
+                    color: Color(0xFFCCBBA0),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 32),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Déjà inscrit ? ',
+                          style: TextStyle(
+                            color: Color(0xFF4A2010),
+                            fontSize: 15,
                           ),
-                          child: Text(
-                            _isLoading ? '...' : "S'inscrire",
-                            style: const TextStyle(
-                              fontSize: 20,
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).pushReplacementNamed('/login');
+                          },
+                          child: const Text(
+                            'Connectez-vous',
+                            style: TextStyle(
+                              color: Color(0xFF3D7A8A),
                               fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                              decorationColor: Color(0xFF3D7A8A),
+                              fontSize: 15,
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_statusMessage != null)
-                        Text(
-                          _statusMessage!,
-                          style: TextStyle(
-                            color: _statusIsError
-                                ? const Color(0xFFD32F2F)
-                                : const Color(0xFF2E7D32),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      const SizedBox(height: 20),
-                      GestureDetector(
-                        onTap: () {
-                          // TODO: implement forgot password.
-                        },
-                        child: const Text(
-                          'Mot de passe oublié ?',
-                          style: TextStyle(
-                            color: Color(0xFFD4845A),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                      const Divider(
-                        height: 32,
-                        color: Color(0xFFCCBBA0),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 32),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Déjà inscrit ? ',
-                        style: TextStyle(
-                          color: Color(0xFF4A2010),
-                          fontSize: 15,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).pushReplacementNamed('/login');
-                        },
-                        child: const Text(
-                          'Connectez-vous',
-                          style: TextStyle(
-                            color: Color(0xFF3D7A8A),
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                            decorationColor: Color(0xFF3D7A8A),
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

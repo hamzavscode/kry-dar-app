@@ -5,10 +5,9 @@ import '../screens/renter_home_screen.dart';
 import '../screens/groups_screen.dart';
 import '../screens/messages_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/add_house_screen.dart';
 import 'bottom_nav_bar.dart';
 
-/// The main navigation shell that wraps all tab screens
-/// with a shared BottomNavigationBar.
 class MainShell extends StatefulWidget {
   const MainShell({super.key, required this.role});
 
@@ -21,12 +20,17 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
+  void _onTabChanged(int index) {
+    setState(() => _currentIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Tab 0 (الرئيسية) and Tab 1 (منازل) both show role-specific content.
-    // For now Tab 0 = overview welcome, Tab 1 = the main houses list.
     final screens = <Widget>[
-      _HomeOverview(role: widget.role),
+      _HomeOverview(
+        role: widget.role,
+        onNavigate: _onTabChanged,
+      ),
       widget.role == 'owner'
           ? const OwnerHomeScreen()
           : const RenterHomeScreen(),
@@ -42,16 +46,16 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: BottomNavBar(
         activeIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: _onTabChanged,
       ),
     );
   }
 }
 
-/// Simple home overview / welcome tab.
 class _HomeOverview extends StatelessWidget {
-  const _HomeOverview({required this.role});
+  const _HomeOverview({required this.role, required this.onNavigate});
   final String role;
+  final Function(int) onNavigate;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +106,6 @@ class _HomeOverview extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-              // Quick action cards
               if (isOwner) ...[
                 _QuickCard(
                   icon: Icons.add_home_outlined,
@@ -110,16 +113,19 @@ class _HomeOverview extends StatelessWidget {
                   subtitle: 'Ajouter une maison pour la louer',
                   color: const Color(0xFFD4845A),
                   onTap: () {
-                    // Navigate to tab 1 (houses)
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AddHouseScreen()),
+                    );
                   },
                 ),
                 const SizedBox(height: 14),
                 _QuickCard(
-                  icon: Icons.bar_chart_outlined,
-                  title: 'Statistiques',
-                  subtitle: 'Chouf l\'activité dyal dyourek',
+                  icon: Icons.home_work_outlined,
+                  title: 'Dyour dyali',
+                  subtitle: 'Gérer vos annonces immobilières',
                   color: const Color(0xFF3D7A8A),
-                  onTap: () {},
+                  onTap: () => onNavigate(1),
                 ),
               ] else ...[
                 _QuickCard(
@@ -127,21 +133,20 @@ class _HomeOverview extends StatelessWidget {
                   title: '9lleb 3la dar',
                   subtitle: 'Chercher dans les maisons proches',
                   color: const Color(0xFF3D7A8A),
-                  onTap: () {},
+                  onTap: () => onNavigate(1),
                 ),
                 const SizedBox(height: 14),
                 _QuickCard(
-                  icon: Icons.bookmark_border,
-                  title: 'Annonces sauvegardées',
-                  subtitle: 'Les maisons li 3jbek',
+                  icon: Icons.group_outlined,
+                  title: 'Les groupes dyali',
+                  subtitle: 'Chouf les groupes li dkhlti lihom',
                   color: const Color(0xFFD4845A),
-                  onTap: () {},
+                  onTap: () => onNavigate(2),
                 ),
               ],
 
               const SizedBox(height: 30),
 
-              // Tips section
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),

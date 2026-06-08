@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/filter_screen.dart';
 import 'widgets/main_shell.dart';
-
-
-import 'package:firebase_core/firebase_core.dart';
+import 'services/current_user_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +23,7 @@ class KriDarKoumApp extends StatelessWidget {
       title: 'Kri Dar.Koum',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(fontFamily: 'serif'),
-      home: const OnboardingScreen(),
+      home: const AuthWrapper(),
       routes: {
         '/login': (_) => const LoginScreen(),
         '/filter': (_) => const FilterScreen(),
@@ -33,6 +32,38 @@ class KriDarKoumApp extends StatelessWidget {
   }
 }
 
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        
+        if (snapshot.hasData) {
+          // User is logged in, need to fetch role
+          return FutureBuilder<Map<String, dynamic>?>(
+            future: CurrentUserService().getCurrentUserDoc(),
+            builder: (context, userDocSnap) {
+              if (userDocSnap.connectionState == ConnectionState.waiting) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              }
+              
+              final role = userDocSnap.data?['role'] ?? 'renter';
+              return MainShell(role: role);
+            },
+          );
+        }
+        
+        return const OnboardingScreen();
+      },
+    );
+  }
+}
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
@@ -45,7 +76,6 @@ class OnboardingScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF5ECD7),
       body: Stack(
         children: [
-          // ── Background arch + lantern (Image 1) ─────────────────────
           Positioned(
             top: 0,
             left: 0,
@@ -56,12 +86,9 @@ class OnboardingScreen extends StatelessWidget {
               fit: BoxFit.cover,
             ),
           ),
-
-          // ── Main scrollable content ───────────────────────────────────
           SafeArea(
             child: Column(
               children: [
-                // Title area (sits inside the arch region)
                 SizedBox(height: screenHeight * 0.05),
                 const Text(
                   'Kri Dar.Koum',
@@ -81,8 +108,6 @@ class OnboardingScreen extends StatelessWidget {
                     fontWeight: FontWeight.w400,
                   ),
                 ),
-
-                // ── Moroccan door illustration (Image 2) ─────────────
                 SizedBox(height: screenHeight * 0.02),
                 Expanded(
                   child: Center(
@@ -95,8 +120,6 @@ class OnboardingScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                // ── Role selector ────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                   child: Text(
@@ -107,13 +130,8 @@ class OnboardingScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                // Owner button
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 6,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
                   child: _RoleButton(
                     icon: Icons.home_outlined,
                     tag: 'OWNER',
@@ -129,8 +147,6 @@ class OnboardingScreen extends StatelessWidget {
                     },
                   ),
                 ),
-
-                // Renter button
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 6, 24, 32),
                   child: _RoleButton(
@@ -187,7 +203,6 @@ class _RoleButton extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Icon circle with tag
             Column(
               children: [
                 Container(
@@ -212,7 +227,6 @@ class _RoleButton extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 16),
-            // Text
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -227,7 +241,7 @@ class _RoleButton extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13),
                 ),
               ],
             ),
@@ -237,4 +251,3 @@ class _RoleButton extends StatelessWidget {
     );
   }
 }
-

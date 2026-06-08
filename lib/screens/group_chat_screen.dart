@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/current_user_service.dart';
 import '../services/firestore_groups_service.dart';
+import 'payment_screen.dart';
 
 class GroupChatScreen extends StatefulWidget {
   const GroupChatScreen({super.key, required this.group});
@@ -90,14 +91,26 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             child: const Text('Annuler', style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Demande envoyée au propriétaire !'),
-                  backgroundColor: Color(0xFFD4845A),
+              
+              // Forward to payment screen
+              final bool? paid = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PaymentScreen(house: widget.group['houseData'] ?? {}),
                 ),
               );
+
+              if (paid == true) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('تم تأمين الدار بنجاح !'),
+                    backgroundColor: Color(0xFF3D7A8A),
+                  ),
+                );
+              }
             },
             child: const Text('Confirmer', style: TextStyle(color: Color(0xFFD4845A))),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/current_user_service.dart';
+import 'bank_accounts_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -41,7 +42,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+    // AuthWrapper will handle redirection to Onboarding
+  }
+
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature bientôt disponible !'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -59,7 +69,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // ── Header with watercolor-style gradient ──────────────
               Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
@@ -75,20 +84,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 12),
-                    // Top bar
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.6),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.settings_outlined,
-                                size: 20, color: Color(0xFF2D2D2D)),
+                          IconButton(
+                            icon: const Icon(Icons.settings_outlined, size: 20, color: Color(0xFF2D2D2D)),
+                            onPressed: () => _showComingSoon('Paramètres'),
                           ),
                           const Expanded(
                             child: Center(
@@ -102,12 +104,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 36),
+                          const SizedBox(width: 48),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // Avatar
                     Container(
                       width: 90,
                       height: 90,
@@ -126,7 +127,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    // Name
                     Text(
                       _fullName,
                       style: const TextStyle(
@@ -136,7 +136,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    // Phone
                     Text(
                       _phone,
                       style: const TextStyle(
@@ -145,7 +144,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // Role toggle
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
@@ -171,7 +169,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // ── Menu items ─────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
@@ -179,27 +176,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _MenuItem(
                       icon: Icons.person_outline,
                       label: 'معلوماتي الشخصية',
-                      onTap: () {},
+                      onTap: () => _showComingSoon('Informations personnelles'),
                     ),
                     _MenuItem(
                       icon: Icons.bookmark_border,
                       label: 'إعلاناتي المحفوظة',
-                      onTap: () {},
+                      onTap: () => _showComingSoon('Annonces sauvegardées'),
                     ),
                     _MenuItem(
                       icon: Icons.notifications_none,
                       label: 'الإشعارات',
-                      onTap: () {},
+                      onTap: () => _showComingSoon('Notifications'),
+                    ),
+                    _MenuItem(
+                      icon: Icons.account_balance_outlined,
+                      label: 'الحسابات البنكية',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const BankAccountsScreen()),
+                        );
+                      },
                     ),
                     _MenuItem(
                       icon: Icons.help_outline,
                       label: 'الدعم والمساعدة',
-                      onTap: () {},
+                      onTap: () => _showComingSoon('Aide'),
                     ),
                     const SizedBox(height: 16),
                     const Divider(color: Color(0xFFCCBBA0)),
                     const SizedBox(height: 8),
-                    // Logout
                     GestureDetector(
                       onTap: _logout,
                       child: Container(
